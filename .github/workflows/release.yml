@@ -20,9 +20,11 @@ jobs:
       - name: Package addon
         uses: BigWigsMods/packager@v2
         env:
-          GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}
-          CF_API_KEY: ${{ secrets.CF_API_KEY }}
+          # 注意变量名：packager v2 读的是 CF_API_TOKEN，不是 CF_API_KEY
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
           WAGO_API_TOKEN: ${{ secrets.WAGO_API_TOKEN }}
+          GITHUB_API_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload zip artifact
         uses: actions/upload-artifact@v4
