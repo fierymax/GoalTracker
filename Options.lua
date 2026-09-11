@@ -399,16 +399,19 @@ function Options:BuildContent(container)
         { value = "currency",   text = L["TYPE_CURRENCY"] },
         { value = "custom",     text = L["TYPE_CUSTOM"] },
     }
+    -- 统一宽度：本节所有输入框/下拉框一行一个，左对齐
+    local ROW_W = 280
+
     Place(CreateDropdown(container, L["GOAL_TYPE"], types,
         function() return ns.db.goalType end,
         function(v) ns.db.goalType = v end,
-        240, function() Options:RebuildDynamic() end), "left", 48)
+        ROW_W, function() Options:RebuildDynamic() end), "left", 48)
 
-    Place(CreateEditBox(container, L["GOAL_NAME"], 240,
+    Place(CreateEditBox(container, L["GOAL_NAME"], ROW_W,
         function() return ns.db.label end,
-        function(v) ns.db.label = v end, false, L["GOAL_NAME_TIP"]), "right", 44)
+        function(v) ns.db.label = v end, false, L["GOAL_NAME_TIP"]), "left", 44)
 
-    Place(CreateEditBox(container, L["TEXT_FORMAT"], 280,
+    Place(CreateEditBox(container, L["TEXT_FORMAT"], ROW_W,
         function() return ns.db.textFormat end,
         function(v) ns.db.textFormat = v end, false, L["TEXT_FORMAT_TIP"]), "left", 44)
 
@@ -839,7 +842,8 @@ function Options:RebuildDynamic()
 
     local y = -4
     local function Add(frame, height)
-        frame:SetPoint("TOPLEFT", dyn, "TOPLEFT", 10, y)
+        -- x 用 0：dyn 本身已被 Both() 放在容器 x=10，再加 10 会比上面的行多缩进一层
+        frame:SetPoint("TOPLEFT", dyn, "TOPLEFT", 0, y)
         y = y - (height or 44) - 6
         return frame
     end
@@ -847,7 +851,7 @@ function Options:RebuildDynamic()
     local t = db.goalType
 
     if t == "money" then
-        Add(CreateEditBox(dyn, L["MONEY_GOAL"], 220,
+        Add(CreateEditBox(dyn, L["MONEY_GOAL"], 280,
             function() return db.moneyGoal end,
             function(v) db.moneyGoal = v; if Options.goldText then Options:UpdateGoldInfo() end end,
             true, L["MONEY_GOAL_TIP"]), 44)
@@ -1238,15 +1242,10 @@ function Options:Init()
     local panel = CreateFrame("Frame", "GoalTrackerOptionsPanel", UIParent)
     self.panel = panel
     panel.name = L["ADDON_TITLE"]
-    panel:SetSize(660, 120)
-
-    local text = panel:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    text:SetPoint("TOPLEFT", panel, "TOPLEFT", 16, -16)
-    text:SetJustifyH("LEFT")
-    text:SetText(L["PANEL_ENTRY_TIP"])
+    panel:SetSize(660, 70)
 
     local openBtn = CreateButton(panel, L["OPEN_SETTINGS"], 200, function() Options:Open() end)
-    openBtn:SetPoint("TOPLEFT", text, "BOTTOMLEFT", 0, -14)
+    openBtn:SetPoint("TOPLEFT", panel, "TOPLEFT", 16, -16)
 
     local registered = false
     if Settings and Settings.RegisterCanvasLayoutCategory and Settings.RegisterAddOnCategory then

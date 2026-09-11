@@ -176,7 +176,6 @@ if loc == "zhCN" or loc == "zhTW" then
     L["SAVED_MSG"]       = "设置已保存。"
     L["CANCEL_MSG"]      = "已关闭，本次修改未保存。"
     L["OPEN_SETTINGS"]   = "打开 GoalTracker 设置"
-    L["PANEL_ENTRY_TIP"] = "点下面的按钮打开设置窗体（也可直接输入 /gt）。"
 
     -- 命令（v2.1 冲突处理）
     L["CMD_SECTION"]      = "聊天命令"
