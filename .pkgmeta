@@ -1,0 +1,15 @@
+package-as: GoalTracker
+
+# 打包时自动生成的许可证文件（放在插件根目录，随 zip 一起分发）
+license-output: LICENSE.txt
+
+# 本插件不依赖任何第三方库，无需生成 nolib 版本
+enable-nolib-creation: no
+
+# 这些文件只用于开发/发布，不进 CurseForge 的 zip
+ignore:
+  - .git
+  - .gitignore
+  - .github
+  - .vscode
+  - docs
