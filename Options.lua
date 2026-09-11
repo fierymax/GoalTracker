@@ -422,50 +422,6 @@ function Options:BuildContent(container)
     self.dynamic = dyn
 
     ------------------------------------------------------------------
-    -- 账号金币明细
-    ------------------------------------------------------------------
-    local gold = CreateFrame("Frame", nil, container)
-    gold:SetSize(620, 230)
-    Both(gold, 230)
-    self.goldSection = gold
-
-    local goldTitle = gold:CreateFontString(nil, "OVERLAY", "GameFontNormal")
-    goldTitle:SetPoint("TOPLEFT", gold, "TOPLEFT", 12, 0)
-    goldTitle:SetText("|cff00c0ff" .. L["ACCOUNT_GOLD"] .. "|r")
-
-    local goldText = gold:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
-    goldText:SetPoint("TOPLEFT", goldTitle, "BOTTOMLEFT", 0, -6)
-    goldText:SetJustifyH("LEFT")
-    goldText:SetJustifyV("TOP")
-    goldText:SetWordWrap(true)
-    goldText:SetWidth(590)
-    self.goldText = goldText
-
-    local hintText = gold:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
-    hintText:SetPoint("TOPLEFT", goldText, "BOTTOMLEFT", 0, -8)
-    hintText:SetJustifyH("LEFT")
-    hintText:SetWordWrap(true)
-    hintText:SetWidth(590)
-    hintText:SetText(L["GOLD_HINT"])
-    self.goldHint = hintText
-
-    local refreshBtn = CreateButton(gold, L["GOLD_REFRESH"], 90, function()
-        ns:UpdateCharacterSnapshot()
-        ns:RefreshWarbandMoney()
-        Options:UpdateGoldInfo()
-        ns:Update(true)
-    end)
-    refreshBtn:SetPoint("BOTTOMLEFT", gold, "BOTTOMLEFT", 12, 0)
-
-    local clearBtn = CreateButton(gold, L["GOLD_CLEAR"], 120, function()
-        ns.db.characters = {}
-        ns:UpdateCharacterSnapshot()
-        Options:UpdateGoldInfo()
-        ns:Update(true)
-    end)
-    clearBtn:SetPoint("LEFT", refreshBtn, "RIGHT", 8, 0)
-
-    ------------------------------------------------------------------
     -- 外观
     ------------------------------------------------------------------
     Both(NewSection(container, L["LOOK"]))
@@ -791,9 +747,59 @@ function Options:BuildContent(container)
     y.left = math.min(y.left, y.right) - 30
     y.right = y.left
 
-    container:SetHeight(math.max(600, math.abs(math.min(y.left, y.right)) + 40))
+    -- 记录不含金币区时的内容高度，供 ResizeGoldSection 参考
+    self.baseContentHeight = math.max(600, math.abs(math.min(y.left, y.right)) + 40)
 
+    ------------------------------------------------------------------
+    -- 账号金币明细（放最后：角色多时向下伸展，不挤占上面的设置项）
+    ------------------------------------------------------------------
+    local goldTop = math.min(y.left, y.right)
+    self.goldTopY = goldTop
+
+    local gold = CreateFrame("Frame", nil, container)
+    gold:SetSize(620, 240)
+    gold:SetPoint("TOPLEFT", container, "TOPLEFT", 10, goldTop)
+    self.goldSection = gold
+
+    local goldTitle = gold:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+    goldTitle:SetPoint("TOPLEFT", gold, "TOPLEFT", 12, 0)
+    goldTitle:SetText("|cff00c0ff" .. L["ACCOUNT_GOLD"] .. "|r")
+
+    local goldText = gold:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    goldText:SetPoint("TOPLEFT", goldTitle, "BOTTOMLEFT", 0, -6)
+    goldText:SetJustifyH("LEFT")
+    goldText:SetJustifyV("TOP")
+    goldText:SetWordWrap(true)
+    goldText:SetWidth(590)
+    self.goldText = goldText
+
+    local hintText = gold:CreateFontString(nil, "OVERLAY", "GameFontDisableSmall")
+    hintText:SetPoint("TOPLEFT", goldText, "BOTTOMLEFT", 0, -8)
+    hintText:SetJustifyH("LEFT")
+    hintText:SetWordWrap(true)
+    hintText:SetWidth(590)
+    hintText:SetText(L["GOLD_HINT"])
+    self.goldHint = hintText
+
+    local refreshBtn = CreateButton(gold, L["GOLD_REFRESH"], 90, function()
+        ns:UpdateCharacterSnapshot()
+        ns:RefreshWarbandMoney()
+        Options:UpdateGoldInfo()
+        ns:Update(true)
+    end)
+    refreshBtn:SetPoint("TOPLEFT", hintText, "BOTTOMLEFT", 0, -8)
+
+    local clearBtn = CreateButton(gold, L["GOLD_CLEAR"], 120, function()
+        ns.db.characters = {}
+        ns:UpdateCharacterSnapshot()
+        Options:UpdateGoldInfo()
+        ns:Update(true)
+    end)
+    clearBtn:SetPoint("LEFT", refreshBtn, "RIGHT", 8, 0)
+
+    -- 先填充动态区域（金币目标/统计范围），再按角色数撑开金币区
     self:RebuildDynamic()
+    self:UpdateGoldInfo()
 end
 
 ----------------------------------------------------------------------
@@ -825,6 +831,26 @@ function Options:UpdateGoldInfo()
     table.insert(lines, string.format("|cff00c0ff%s|r  |cff00ff00%s|r G", L["GOLD_TOTAL"], ns.FormatNumber(total / 10000)))
 
     self.goldText:SetText(table.concat(lines, "\n"))
+    self:ResizeGoldSection()
+end
+
+-- 按角色行数撑开金币区高度，并同步滚动内容的总高度
+function Options:ResizeGoldSection()
+    local gold = self.goldSection
+    if not gold then return end
+
+    local listH  = (self.goldText and self.goldText:GetStringHeight()) or 0
+    local hintH  = (self.goldHint and self.goldHint:GetStringHeight()) or 0
+    -- 标题(16) + 间隔(6) + 列表 + 间隔(8) + 说明 + 按钮行(28) + 底部留白(12)
+    local h = 22 + listH + 8 + hintH + 40
+    if h < 200 then h = 200 end
+    gold:SetHeight(h)
+
+    local c = self.container
+    if c and self.goldTopY then
+        local need = math.abs(self.goldTopY) + h + 40
+        c:SetHeight(math.max(self.baseContentHeight or 600, need))
+    end
 end
 
 ----------------------------------------------------------------------
