@@ -9,6 +9,9 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # GitHub 现在默认给 GITHUB_TOKEN 只读权限，没有这个会 403，导致打包器以失败退出
+    permissions:
+      contents: write
     steps:
       - name: Checkout
         uses: actions/checkout@v4
