@@ -1,0 +1,14 @@
+# 发布包
+*.zip
+.release/
+.releases/
+
+# 编辑器
+.vscode/
+.idea/
+*.swp
+
+# 系统
+Thumbs.db
+.DS_Store
+desktop.ini
