@@ -18,6 +18,16 @@ jobs:
         with:
           fetch-depth: 0
 
+      # 诊断步骤：没配 token 时打包器会静默跳过 CurseForge 上传（退出码仍是 0），
+      # 这里显式失败，避免"绿色对勾但其实没上传"的假成功
+      - name: Verify CurseForge token
+        if: ${{ secrets.CF_API_TOKEN == '' && secrets.CF_API_KEY == '' }}
+        run: |
+          echo "::error::Neither CF_API_TOKEN nor CF_API_KEY secret is set."
+          echo "::error::Add it in Settings -> Secrets and variables -> Actions -> New repository secret."
+          echo "::error::Token comes from https://authors.curseforge.com/account/api-tokens"
+          exit 1
+
       # 用 BigWigsMods 官方打包器：按 .pkgmeta 生成插件 zip
       # 不配置密钥时只本地出包；配了密钥会自动投递 CurseForge / Wago / GitHub Release
       - name: Package addon
