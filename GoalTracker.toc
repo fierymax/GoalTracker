@@ -1,9 +1,10 @@
 ## Interface: 120100
 ## Title: |cff00c0ffGoalTracker|r 目标追踪
 ## Author: fierymax
-## Version: 1.0.0
+## Version: 1.0.1
 ## X-License: MIT
 ## X-Website: https://github.com/fierymax/GoalTracker
+## X-Curse-Project-ID: 1690611
 ## Notes: Account-wide goal tracker (default 7,000,000 gold). Command: /gttx
 ## Notes:zhCN: 战网账号全局目标追踪：默认 7,000,000 金币（统计全部角色 + 战团银行），达成每 0.01% 在屏幕中央播报鼓励。命令：/gttx
 ## SavedVariables: GoalTrackerDB

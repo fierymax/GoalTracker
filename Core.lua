@@ -7,7 +7,7 @@ local ADDON_NAME, ns = ...
 local L = ns.L
 
 ns.ADDON_NAME = ADDON_NAME
-ns.VERSION    = "1.0.0"
+ns.VERSION    = "1.0.1"
 
 ----------------------------------------------------------------------
 -- 默认值（账号全局：TOC 中使用 SavedVariables，非 PerCharacter）

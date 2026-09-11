@@ -195,7 +195,7 @@ if loc == "zhCN" or loc == "zhTW" then
 
     -- 关于
     L["ABOUT"]           = "关于"
-    L["ABOUT_TEXT"]      = "版本 1.0.0 · 作者 fierymax · 无外部依赖，纯原生实现。所有设置按战网账号保存。"
+    L["ABOUT_TEXT"]      = "版本 1.0.1 · 作者 fierymax · 无外部依赖，纯原生实现。所有设置按战网账号保存。"
 
     -- 内置鼓励语（前 25 条通用，后 25 条为口语梗 / 搞钱梗）
     ns.PRAISES = {
@@ -424,7 +424,7 @@ else
     L["CMD_USAGE"]        = "Usage: <cmd> options | lock | reset | gold | test | cmd xxx | cmds | dump"
 
     L["ABOUT"]           = "About"
-    L["ABOUT_TEXT"]      = "Version 1.0.0 · by fierymax · No dependencies. Settings are saved per Battle.net account."
+    L["ABOUT_TEXT"]      = "Version 1.0.1 · by fierymax · No dependencies. Settings are saved per Battle.net account."
 
     -- Built-in praises (first 25 generic, next 25 slang / money vibes)
     ns.PRAISES = {
