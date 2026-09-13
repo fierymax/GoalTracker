@@ -56,6 +56,17 @@ if loc == "zhCN" or loc == "zhTW" then
     L["GOLD_UPDATED"]    = "更新于"
     L["GOLD_HINT"]       = "说明：只有登录过的角色才能被统计，未登录过的角色无法读取其金币（暴雪接口限制）。战团银行金币在打开战团银行时刷新。"
 
+    -- 每日收入折线图
+    L["INCOME_TITLE"]    = "每日收入（近 %d 天）"
+    L["INCOME_TODAY"]    = "今日"
+    L["INCOME_AVG"]      = "日均"
+    L["INCOME_TOTAL"]    = "区间合计"
+    L["INCOME_PEAK"]     = "峰值"
+    L["INCOME_EMPTY"]    = "暂无数据，赚到第一笔钱后会自动记录。"
+    L["INCOME_PRINT"]    = "每日收入（近 %d 天）"
+    L["INCOME_ROW"]      = "  %s  %s G"
+    L["INCOME_CLEARED"]  = "每日收入记录已清空。"
+
     -- 里程碑播报
     L["NOTIFY"]          = "里程碑播报"
     L["NOTIFY_ENABLE"]   = "启用播报"
@@ -177,12 +188,10 @@ if loc == "zhCN" or loc == "zhTW" then
     L["CANCEL_MSG"]      = "已关闭，本次修改未保存。"
     L["OPEN_SETTINGS"]   = "打开 GoalTracker 设置"
 
-    -- 命令（v2.1 冲突处理）
+    -- 命令（自动避开与其它插件冲突）
     L["CMD_SECTION"]      = "聊天命令"
     L["CMD_CUSTOM"]       = "自定义命令（不含 /）"
-    L["CMD_CUSTOM_TIP"]   = "与别的插件撞车时填一个专属命令，例如 gtx。留空=自动。也可聊天框输入 /goaltracker cmd gtx。"
-    L["CMD_FORCE_GT"]     = "强行占用 /gt"
-    L["CMD_FORCE_GT_TIP"] = "当 /gt 已被别的插件使用时，勾选后由本插件接管（需 /reload 生效）。不勾选则自动让出，改用其它命令。"
+    L["CMD_CUSTOM_TIP"]   = "想换个更好记的命令就填一个，例如 gtx。留空=自动。也可聊天框输入 /goaltracker cmd gtx。"
     L["CMD_ACTIVE"]       = "当前可用：%s"
     L["CMD_TAKEN"]        = "%s 已被其它插件占用，已自动改用：%s（可在 设置→聊天命令 里自定义）"
     L["CMD_TAKEN_SHORT"]  = "已让出（被占用）：%s"
@@ -190,11 +199,11 @@ if loc == "zhCN" or loc == "zhTW" then
     L["CMD_CLEARED"]      = "已清除自定义命令，恢复默认。"
     L["CMD_INVALID"]      = "命令无效：只能包含字母、数字、下划线。"
     L["CMD_ALL"]          = "全部可用："
-    L["CMD_USAGE"]        = "用法：<命令> 打开设置 | lock 锁定 | reset 复位 | gold 金币明细 | test 测试播报 | cmd xxx 改命令 | cmds 查看命令 | dump 调试快照"
+    L["CMD_USAGE"]        = "用法：<命令> 打开设置 | lock 锁定 | reset 复位 | gold 金币明细 | income 每日收入 | test 测试播报 | cmd xxx 改命令 | cmds 查看命令 | dump 调试快照"
 
     -- 关于
     L["ABOUT"]           = "关于"
-    L["ABOUT_TEXT"]      = "版本 1.0.1 · 作者 fierymax · 无外部依赖，纯原生实现。所有设置按战网账号保存。"
+    L["ABOUT_TEXT"]      = "版本 1.0.2 · 作者 fierymax · 无外部依赖，纯原生实现。所有设置按战网账号保存。"
 
     -- 内置鼓励语（前 25 条通用，后 25 条为口语梗 / 搞钱梗）
     ns.PRAISES = {
@@ -295,6 +304,17 @@ else
     L["GOLD_CLEAR"]      = "Clear records"
     L["GOLD_UPDATED"]    = "Updated"
     L["GOLD_HINT"]       = "Only characters you have logged in with are counted (Blizzard API limit). Warband bank gold refreshes when you open the warband bank."
+
+    -- Daily income line chart
+    L["INCOME_TITLE"]    = "Daily income (last %d days)"
+    L["INCOME_TODAY"]    = "Today"
+    L["INCOME_AVG"]      = "Daily avg"
+    L["INCOME_TOTAL"]    = "Period total"
+    L["INCOME_PEAK"]     = "Peak"
+    L["INCOME_EMPTY"]    = "No data yet - it starts recording as soon as you earn gold."
+    L["INCOME_PRINT"]    = "Daily income (last %d days)"
+    L["INCOME_ROW"]      = "  %s  %s G"
+    L["INCOME_CLEARED"]  = "Daily income history cleared."
 
     L["NOTIFY"]          = "Milestone announcement"
     L["NOTIFY_ENABLE"]   = "Enable announcement"
@@ -406,13 +426,10 @@ else
     L["SAVED_MSG"]       = "Settings saved."
     L["CANCEL_MSG"]      = "Closed without saving."
     L["OPEN_SETTINGS"]   = "Open GoalTracker settings"
-    L["PANEL_ENTRY_TIP"] = "Click the button below to open the settings window (or type /gt)."
 
     L["CMD_SECTION"]      = "Chat commands"
     L["CMD_CUSTOM"]       = "Custom command (without /)"
-    L["CMD_CUSTOM_TIP"]   = "Use a unique command if /gt is taken by another addon, e.g. gtx. Leave empty for auto."
-    L["CMD_FORCE_GT"]     = "Force-take /gt"
-    L["CMD_FORCE_GT_TIP"] = "Take over /gt even if another addon owns it (needs /reload). Otherwise GoalTracker steps aside."
+    L["CMD_CUSTOM_TIP"]   = "Pick a command you like, e.g. gtx. Leave empty for auto."
     L["CMD_ACTIVE"]       = "Active: %s"
     L["CMD_TAKEN"]        = "%s is already used by another addon; using %s instead (customize in Options > Chat commands)."
     L["CMD_TAKEN_SHORT"]  = "Skipped (taken): %s"
@@ -420,10 +437,10 @@ else
     L["CMD_CLEARED"]      = "Custom command cleared."
     L["CMD_INVALID"]      = "Invalid command: letters, digits and underscore only."
     L["CMD_ALL"]          = "All commands: "
-    L["CMD_USAGE"]        = "Usage: <cmd> options | lock | reset | gold | test | cmd xxx | cmds | dump"
+    L["CMD_USAGE"]        = "Usage: <cmd> options | lock | reset | gold | income | test | cmd xxx | cmds | dump"
 
     L["ABOUT"]           = "About"
-    L["ABOUT_TEXT"]      = "Version 1.0.1 · by fierymax · No dependencies. Settings are saved per Battle.net account."
+    L["ABOUT_TEXT"]      = "Version 1.0.2 · by fierymax · No dependencies. Settings are saved per Battle.net account."
 
     -- Built-in praises (first 25 generic, next 25 slang / money vibes)
     ns.PRAISES = {

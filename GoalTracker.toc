@@ -1,7 +1,7 @@
 ## Interface: 120100
 ## Title: |cff00c0ffGoalTracker|r 目标追踪
 ## Author: fierymax
-## Version: 1.0.1
+## Version: 1.0.2
 ## X-License: MIT
 ## X-Website: https://github.com/fierymax/GoalTracker
 ## X-Curse-Project-ID: 1690611

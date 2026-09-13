@@ -37,6 +37,162 @@ local function SetStrata(f, ...)
 end
 
 ----------------------------------------------------------------------
+-- 每日收入折线图
+-- GameTooltip 只能加文字行，放不进真正的画布，所以这里做一个独立小框，
+-- 用和提示框一样的底色/描边挂在提示框正下方，看起来就是提示框的一部分。
+----------------------------------------------------------------------
+local GRAPH_DAYS  = 10      -- 显示天数
+local GRAPH_H     = 64      -- 图高
+local GRAPH_PAD_L = 8
+local GRAPH_PAD_R = 8
+local GRAPH_PAD_B = 13      -- 底部留给日期
+local GRAPH_PAD_T = 13      -- 顶部留给峰值
+-- 线段用纹理旋转画；如果发现折线方向反了，把这里改成 -1 即可
+local ROT_SIGN    = 1
+
+function Display:EnsureGraph()
+    if self.graph then return self.graph end
+
+    local ok, g = pcall(CreateFrame, "Frame", "GoalTrackerGraphFrame", GameTooltip, "BackdropTemplate")
+    if not ok or not g then
+        g = CreateFrame("Frame", "GoalTrackerGraphFrame", GameTooltip)
+    end
+    self.graph = g
+    g:SetHeight(GRAPH_H)
+    Safe(g, "SetFrameStrata", "TOOLTIP")
+    g:SetFrameLevel(250)
+    Safe(g, "SetBackdrop", {
+        bgFile   = "Interface\\Tooltips\\UI-Tooltip-Background",
+        edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
+        tile = true, tileSize = 16, edgeSize = 12,
+        insets = { left = 3, right = 3, top = 3, bottom = 3 },
+    })
+    Safe(g, "SetBackdropColor", 0, 0, 0, 0.92)
+    Safe(g, "SetBackdropBorderColor", 0.7, 0.7, 0.7, 0.7)
+    g:Hide()
+
+    local function Bar(layer, r, gg, b, a)
+        local t = g:CreateTexture(nil, layer)
+        t:SetTexture("Interface\\Buttons\\WHITE8x8")
+        t:SetVertexColor(r, gg, b, a)
+        return t
+    end
+
+    -- 网格：0 / 50% / 100% 三条
+    g.grid = {}
+    for i = 1, 3 do
+        g.grid[i] = Bar("BORDER", 1, 1, 1, 0.09)
+        g.grid[i]:SetHeight(1)
+    end
+
+    g.bars, g.lines, g.dots = {}, {}, {}
+    for i = 1, GRAPH_DAYS do
+        g.bars[i] = Bar("ARTWORK", 1, 0.76, 0.15, 0.22)          -- 面积柱
+        local d = Bar("OVERLAY", 1, 0.85, 0.25, 1)               -- 数据点
+        d:SetSize(5, 5)
+        g.dots[i] = d
+        if i < GRAPH_DAYS then
+            g.lines[i] = Bar("ARTWORK", 1, 0.82, 0.2, 0.95)      -- 折线
+        end
+    end
+
+    local function Label(justify)
+        local fs = g:CreateFontString(nil, "OVERLAY")
+        if fs.SetFontObject and GameTooltipTextSmall then
+            fs:SetFontObject(GameTooltipTextSmall)
+        end
+        fs:SetJustifyH(justify)
+        return fs
+    end
+    g.peakText  = Label("RIGHT")
+    g.leftText  = Label("LEFT")
+    g.rightText = Label("RIGHT")
+    g.peakText:SetPoint("TOPRIGHT", g, "TOPRIGHT", -7, -4)
+    g.leftText:SetPoint("BOTTOMLEFT", g, "BOTTOMLEFT", 7, 3)
+    g.rightText:SetPoint("BOTTOMRIGHT", g, "BOTTOMRIGHT", -7, 3)
+    g.peakText:SetTextColor(1, 0.82, 0.2, 1)
+    g.leftText:SetTextColor(0.7, 0.7, 0.7, 1)
+    g.rightText:SetTextColor(0.7, 0.7, 0.7, 1)
+
+    return g
+end
+
+function Display:DrawGraph()
+    local g = self:EnsureGraph()
+    local s = ns.GetDailyIncomeSummary and ns:GetDailyIncomeSummary(GRAPH_DAYS) or nil
+    if not s or not s.series or #s.series == 0 then g:Hide(); return end
+
+    local series = s.series
+    local n = #series
+    local maxV = s.peak or 0
+    if maxV <= 0 then maxV = 1 end
+
+    local plotH = GRAPH_H - GRAPH_PAD_B - GRAPH_PAD_T
+    local plotW = (g:GetWidth() or 236) - GRAPH_PAD_L - GRAPH_PAD_R
+    if plotW < 20 then plotW = 20 end
+    local stepX = n > 1 and (plotW / (n - 1)) or 0
+
+    local function PX(i) return GRAPH_PAD_L + (i - 1) * stepX end
+    local function PY(v) return GRAPH_PAD_B + (v / maxV) * plotH end
+
+    for i = 1, 3 do
+        local t = g.grid[i]
+        t:ClearAllPoints()
+        t:SetPoint("BOTTOMLEFT", g, "BOTTOMLEFT", GRAPH_PAD_L, GRAPH_PAD_B + plotH * (i - 1) / 2)
+        t:SetWidth(plotW)
+        t:Show()
+    end
+
+    for i = 1, GRAPH_DAYS do
+        local d, bar, dot, line = series[i], g.bars[i], g.dots[i], g.lines[i]
+        if d then
+            local x, y = PX(i), PY(d.value)
+            bar:ClearAllPoints()
+            bar:SetPoint("BOTTOM", g, "BOTTOMLEFT", x, GRAPH_PAD_B)
+            bar:SetWidth(math.max(stepX - 4, 3))
+            bar:SetHeight(math.max(y - GRAPH_PAD_B, 1))
+            bar:Show()
+            dot:ClearAllPoints()
+            dot:SetPoint("CENTER", g, "BOTTOMLEFT", x, y)
+            dot:Show()
+        else
+            bar:Hide(); dot:Hide()
+        end
+        if line then
+            local a, b = series[i], series[i + 1]
+            if a and b then
+                local x1, y1 = PX(i), PY(a.value)
+                local x2, y2 = PX(i + 1), PY(b.value)
+                local dx, dy = x2 - x1, y2 - y1
+                local len = math.sqrt(dx * dx + dy * dy)
+                line:ClearAllPoints()
+                line:SetSize(math.max(len, 0.01), 2)
+                line:SetPoint("CENTER", g, "BOTTOMLEFT", (x1 + x2) / 2, (y1 + y2) / 2)
+                if line.SetRotation then
+                    line:SetRotation(ROT_SIGN * math.atan2(dy, dx))
+                end
+                line:Show()
+            else
+                line:Hide()
+            end
+        end
+    end
+
+    g.peakText:SetText(string.format("%s %s G", L["INCOME_PEAK"], ns.ShortNum(maxV)))
+    g.leftText:SetText(series[1].label)
+    g.rightText:SetText(series[n].label)
+
+    g:ClearAllPoints()
+    g:SetPoint("TOPLEFT", GameTooltip, "BOTTOMLEFT", 8, 3)
+    g:SetPoint("TOPRIGHT", GameTooltip, "BOTTOMRIGHT", -8, 3)
+    g:Show()
+end
+
+function Display:HideGraph()
+    if self.graph then self.graph:Hide() end
+end
+
+----------------------------------------------------------------------
 -- 主显示框体
 ----------------------------------------------------------------------
 function Display:Init()
@@ -110,10 +266,11 @@ function Display:Init()
         ns:Update(true)
     end)
 
-    -- 鼠标提示：账号金币明细
+    -- 鼠标提示：账号金币明细 + 每日收入折线图
     f:SetScript("OnEnter", function(self)
         if ns.db.clickThrough then return end
         if ns.db.goalType ~= "money" or ns.db.moneyScope ~= "account" then
+            Display:HideGraph()
             GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
             GameTooltip:AddLine("|cff00c0ff" .. L["ADDON_TITLE"] .. "|r")
             GameTooltip:AddLine(L["ACCOUNT_TIP"], 1, 1, 1, true)
@@ -122,6 +279,8 @@ function Display:Init()
         end
         local total, list, warband = ns:GetAccountGold()
         GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
+        -- 图挂在提示框下方，宽度要和图一致，否则会一宽一窄很难看
+        Safe(GameTooltip, "SetMinimumWidth", 252)
         GameTooltip:AddLine("|cff00c0ff" .. L["ACCOUNT_GOLD"] .. "|r")
         GameTooltip:AddLine(" ")
         for _, c in ipairs(list) do
@@ -135,9 +294,30 @@ function Display:Init()
         GameTooltip:AddDoubleLine(L["GOLD_TOTAL"], string.format("|cff00ff00%s|r G", ns.FormatNumber(total / 10000)))
         GameTooltip:AddLine(" ")
         GameTooltip:AddLine(L["GOLD_HINT"], 0.7, 0.7, 0.7, true)
+
+        -- 每日收入
+        GameTooltip:AddLine(" ")
+        GameTooltip:AddLine("|cff00c0ff" .. string.format(L["INCOME_TITLE"], GRAPH_DAYS) .. "|r")
+        if ns.GetDailyIncomeSummary then
+            local s = ns:GetDailyIncomeSummary(GRAPH_DAYS)
+            if s.total <= 0 then
+                GameTooltip:AddLine(L["INCOME_EMPTY"], 0.7, 0.7, 0.7, true)
+            else
+                GameTooltip:AddDoubleLine(L["INCOME_TODAY"],
+                    string.format("|cffffd100%s|r G", ns.FormatNumber(s.today)))
+                GameTooltip:AddDoubleLine(L["INCOME_AVG"],
+                    string.format("|cffffd100%s|r G", ns.FormatNumber(s.avg)))
+                GameTooltip:AddDoubleLine(L["INCOME_TOTAL"],
+                    string.format("|cff00ff00%s|r G", ns.FormatNumber(s.total)))
+            end
+        end
         GameTooltip:Show()
+        Display:DrawGraph()
     end)
-    f:SetScript("OnLeave", function() GameTooltip:Hide() end)
+    f:SetScript("OnLeave", function()
+        GameTooltip:Hide()
+        Display:HideGraph()
+    end)
 
     self:ApplySettings()
     self:EnsureAnnounce()

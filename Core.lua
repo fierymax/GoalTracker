@@ -7,7 +7,7 @@ local ADDON_NAME, ns = ...
 local L = ns.L
 
 ns.ADDON_NAME = ADDON_NAME
-ns.VERSION    = "1.0.1"
+ns.VERSION    = "1.0.2"
 
 ----------------------------------------------------------------------
 -- 默认值（账号全局：TOC 中使用 SavedVariables，非 PerCharacter）
@@ -62,6 +62,12 @@ local DEFAULTS = {
     characters = {},          -- ["名字-服务器"] = { money, time, class, level }
     warband    = { money = 0, time = 0 },
 
+    -- 每日收入（鼠标提示里的折线图用）
+    dailyIncome  = {},        -- ["2026-09-13"] = 当天累计收入（单位：金）
+    dailyDay     = nil,       -- 上次记账的自然日（YYYY-MM-DD）
+    dailyBase    = nil,       -- 当天基准金额（金），涨了才算收入
+    dailyWarband = nil,       -- 上次记账时的战团银行金额（金）
+
     -- 里程碑播报
     notifyEnabled  = true,
     notifyStep     = 0.01,
@@ -100,11 +106,11 @@ local DEFAULTS = {
     praiseList     = nil,
     lastStep       = nil,
     lastTotal      = nil,
+    lastWarband    = nil,     -- 上次比较时的战团银行金额（用于剔除存/取钱造成的假消费）
     lastPraise     = nil,
 
-    -- 聊天命令（v2.1：自动避开与其它插件冲突）
-    chatCommand    = nil,     -- 自定义主命令，例如 "gtx"（不含斜杠）
-    forceGT        = false,   -- true = 即使 /gt 已被其它插件占用也强行接管
+    -- 聊天命令（自定义命令，不含斜杠；本插件不会去抢别人已占用的短命令）
+    chatCommand    = nil,     -- 自定义主命令，例如 "gtx"
 }
 
 local function ApplyDefaults(dst, src)
@@ -484,6 +490,130 @@ function ns:PrintGoldBreakdown()
 end
 
 ----------------------------------------------------------------------
+-- 每日收入统计（鼠标提示里的折线图数据源）
+----------------------------------------------------------------------
+local DAY_SECONDS = 86400
+local INCOME_KEEP = 30        -- 存档里最多保留多少天，防止无限增长
+ns.INCOME_DAYS    = 10        -- 折线图默认显示多少天
+
+function ns:DayKey(ts)
+    return date("%Y-%m-%d", ts or time())
+end
+
+-- 只保留最近 INCOME_KEEP 天
+function ns:PruneDailyIncome()
+    local db = self.db
+    if type(db.dailyIncome) ~= "table" then return end
+    local keys = {}
+    for k in pairs(db.dailyIncome) do
+        if type(k) == "string" then keys[#keys + 1] = k end
+    end
+    if #keys <= INCOME_KEEP then return end
+    table.sort(keys)
+    for i = 1, #keys - INCOME_KEEP do db.dailyIncome[keys[i]] = nil end
+end
+
+-- 累加「净增长」部分：只统计真正变多的那一段，花掉再赚回来不会重复计入。
+-- 存取战团银行造成的账面跳动会被剔除（银行界面开着 / 银行数值刚变过 都直接重定基准）。
+function ns:TrackDailyIncome(p)
+    local db = self.db
+    if not db or not p then return end
+    if (db.goalType or "money") ~= "money" then return end
+
+    local cur     = tonumber(p.current) or 0
+    local warband = (tonumber(db.warband and db.warband.money) or 0) / 10000
+    local day     = self:DayKey()
+
+    db.dailyIncome = db.dailyIncome or {}
+
+    -- 换天了：重新定基准，昨天到今天的落差不算今天的收入
+    if db.dailyDay ~= day then
+        db.dailyDay     = day
+        db.dailyBase    = cur
+        db.dailyWarband = warband
+        self:PruneDailyIncome()
+        return
+    end
+
+    local base  = tonumber(db.dailyBase)
+    local lastW = tonumber(db.dailyWarband)
+
+    -- 银行界面开着，或战团银行数值刚变过：这次变动多半是在存/取钱，只重定基准不记账
+    local warbandMoved = (lastW == nil) or (math.abs(warband - lastW) > 0.0001)
+    if ns.bankOpen or warbandMoved or base == nil then
+        db.dailyBase    = cur
+        db.dailyWarband = warband
+        return
+    end
+
+    if cur > base then
+        db.dailyIncome[day] = (tonumber(db.dailyIncome[day]) or 0) + (cur - base)
+    end
+    db.dailyBase    = cur
+    db.dailyWarband = warband
+end
+
+-- 最近 n 天的序列（没有记录的天补 0）
+function ns:GetDailyIncomeSeries(n)
+    n = tonumber(n) or ns.INCOME_DAYS
+    local db = self.db
+    db.dailyIncome = db.dailyIncome or {}
+    local out = {}
+    local now = time()
+    for i = n - 1, 0, -1 do
+        local ts  = now - i * DAY_SECONDS
+        local key = date("%Y-%m-%d", ts)
+        out[#out + 1] = {
+            key   = key,
+            label = date("%m-%d", ts),
+            value = tonumber(db.dailyIncome[key]) or 0,
+        }
+    end
+    return out
+end
+
+function ns:GetDailyIncomeSummary(n)
+    local series = self:GetDailyIncomeSeries(n)
+    local total, days, today, peak = 0, 0, 0, 0
+    for i, d in ipairs(series) do
+        total = total + d.value
+        if d.value > 0 then days = days + 1 end
+        if d.value > peak then peak = d.value end
+        if i == #series then today = d.value end
+    end
+    return {
+        series = series,
+        total  = total,
+        peak   = peak,
+        today  = today,
+        avg    = days > 0 and (total / days) or 0,
+        days   = days,
+    }
+end
+
+function ns:ResetDailyIncome()
+    local db = self.db
+    if not db then return end
+    db.dailyIncome = {}
+    db.dailyDay    = self:DayKey()
+    db.dailyBase   = nil
+end
+
+-- 聊天框打印最近 n 天
+function ns:PrintDailyIncome(n)
+    n = tonumber(n) or ns.INCOME_DAYS
+    local s = self:GetDailyIncomeSummary(n)
+    print("|cff00c0ffGoalTracker|r " .. string.format(L["INCOME_PRINT"], n) .. "：")
+    for _, d in ipairs(s.series) do
+        print(string.format(L["INCOME_ROW"], d.label, ns.FormatNumber(d.value)))
+    end
+    print(string.format("  %s %s G  |  %s %s G  |  %s %s G",
+        L["INCOME_TOTAL"], ns.FormatNumber(s.total),
+        L["INCOME_AVG"],   ns.FormatNumber(s.avg),
+        L["INCOME_PEAK"],  ns.FormatNumber(s.peak)))
+end
+
+----------------------------------------------------------------------
 -- 进度计算
 ----------------------------------------------------------------------
 local function NewProgress()
@@ -715,15 +845,23 @@ function ns:CheckMilestone(p)
     local pct  = (p.pct or 0) * 100
     local step = math.floor(pct / stepSize + 0.000001)
 
+    local warbandNow = tonumber(db.warband and db.warband.money) or 0
+
     if db.lastStep == nil then
         db.lastStep     = step
         db.lastTotal    = p.current
         db.lastGainBase = p.current
+        db.lastWarband  = warbandNow
         return
     end
 
     local prev = tonumber(db.lastTotal) or 0
     local cur  = p.current or 0
+
+    -- 战团银行变动量：往银行存钱 / 取钱时，角色金币和银行金币一增一减，
+    -- 但两边刷新有先后顺序（银行要开界面或定时才刷新），会出现"合计临时变少"的假象。
+    local warbandThen = tonumber(db.lastWarband) or 0
+    local wDelta = warbandNow - warbandThen
 
     ------------------------------------------------------------------
     -- 金额变少 = 花钱（不管有没有跨过里程碑档位都要检查，否则小额花费会被漏掉）
@@ -732,8 +870,48 @@ function ns:CheckMilestone(p)
         local spend   = prev - cur
         db.lastStep  = step
         db.lastTotal = cur
+        db.lastWarband = warbandNow
 
         if db.regretEnabled == false or spend <= 0 then return end
+
+        --------------------------------------------------------------
+        -- 战团银行：把「存钱/取钱」和「真花钱」区分开
+        -- 难点在于 db.warband.money 刷新滞后——角色金币实时变化，
+        -- 银行数值要开界面或定时才更新，所以报错那一刻两边常常都是旧值，
+        -- 光比较 warband 前后差是抓不到的，必须主动补一次刷新。
+        --------------------------------------------------------------
+        -- ① 银行界面开着：金币变动只可能是存取，直接不算消费
+        if ns.bankOpen then
+            db.lastWarband = warbandNow
+            return
+        end
+
+        -- ② 主动拉一次战团银行金额，用刷新后的合计重新判一次
+        if self.RefreshWarbandMoney then
+            self:RefreshWarbandMoney()
+            local w2 = tonumber(db.warband and db.warband.money) or 0
+            if w2 ~= warbandNow then
+                warbandNow = w2
+                db.lastWarband = w2
+                local newTotal = self.GetAccountGold and select(1, self:GetAccountGold()) or nil
+                if newTotal then
+                    cur = newTotal
+                    db.lastTotal = cur
+                    if cur >= prev then return end      -- 钱只是挪进了银行
+                    spend = prev - cur
+                end
+            end
+        end
+
+        -- ③ 减少的金额基本等于战团银行的变动量 → 在角色和银行之间挪钱，不算消费
+        --    （取钱的情况：角色先变多，等银行数值回落时合计才掉下来）
+        local wDelta2 = warbandNow - warbandThen
+        local adj = spend - math.abs(wDelta2)
+        if wDelta2 ~= 0 and adj <= 0 then
+            db.lastWarband = warbandNow
+            return
+        end
+        if adj > 0 then spend = adj end
 
         local pctOfGoal = (spend / p.goal) * 100
         local pctHeld   = prev > 0 and (spend / prev) * 100 or 0
@@ -768,6 +946,7 @@ function ns:CheckMilestone(p)
     -- 金额变多：只有跨过档位才播报
     ------------------------------------------------------------------
     if cur > prev then db.lastTotal = cur end     -- 随手更新基准，避免多笔收入后误判成巨额花费
+    db.lastWarband = warbandNow                   -- 同步银行基准，下次比较才准
 
     if step <= db.lastStep then return end
 
@@ -850,6 +1029,7 @@ local function DoUpdate()
     local p = ns:ComputeProgress()
     ns.Display:Render(p)
     ns:UpdateLive(p)
+    ns:TrackDailyIncome(p)
     ns:CheckMilestone(p)
 end
 
@@ -879,8 +1059,11 @@ eventFrame:RegisterEvent("QUEST_REMOVED")
 eventFrame:RegisterEvent("UPDATE_FACTION")
 eventFrame:RegisterEvent("MAJOR_FACTION_RENOWN_LEVEL_CHANGED")
 eventFrame:RegisterEvent("CURRENCY_DISPLAY_UPDATE")
+-- 战团银行是独立界面，老事件 BANKFRAME_OPENED 不一定会触发，用交互事件兜底
+eventFrame:RegisterEvent("PLAYER_INTERACTION_MANAGER_FRAME_SHOW")
+eventFrame:RegisterEvent("PLAYER_INTERACTION_MANAGER_FRAME_HIDE")
 
-eventFrame:SetScript("OnEvent", function(_, event)
+eventFrame:SetScript("OnEvent", function(_, event, ...)
     if event == "PLAYER_LOGIN" then
         GoalTrackerDB = GoalTrackerDB or {}
         ApplyDefaults(GoalTrackerDB, DEFAULTS)
@@ -893,6 +1076,7 @@ eventFrame:SetScript("OnEvent", function(_, event)
 
         ns:UpdateCharacterSnapshot()
         ns:RefreshWarbandMoney()
+        ns:PruneDailyIncome()
 
         if ns.Display then ns.Display:Init() end
         if ns.Options then ns.Options:Init() end
@@ -924,6 +1108,28 @@ eventFrame:SetScript("OnEvent", function(_, event)
         ns:RefreshWarbandMoney()
     elseif event == "BANKFRAME_CLOSED" then
         ns.bankOpen = false
+    end
+
+    -- 战团银行 / 银行界面的开关（兼容两套事件）
+    local itype = ...
+    if Enum and Enum.PlayerInteractionType then
+        local IT = Enum.PlayerInteractionType
+        local isBank = (itype == IT.Banker) or (itype == IT.AccountBanker)
+        if isBank then
+            if event == "PLAYER_INTERACTION_MANAGER_FRAME_SHOW" then
+                ns.bankOpen = true
+                ns:RefreshWarbandMoney()
+            elseif event == "PLAYER_INTERACTION_MANAGER_FRAME_HIDE" then
+                ns.bankOpen = false
+            end
+        end
+    end
+
+    -- 银行界面开着时，金币变动只可能是存取：同步刷新银行数值，
+    -- 避免「角色的钱已扣、银行还没加」造成的假消费
+    if ns.bankOpen and (event == "PLAYER_MONEY" or event == "BAG_UPDATE"
+        or event == "PLAYERBANKSLOTS_CHANGED" or event == "BANK_TABS_CHANGED") then
+        ns:RefreshWarbandMoney()
     end
 
     -- 背包变化常常意味着金币变动（拾取/购买/卖物），

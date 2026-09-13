@@ -718,10 +718,6 @@ function Options:BuildContent(container)
             end
         end, false, L["CMD_CUSTOM_TIP"]), "left", 44)
 
-    Place(CreateCheck(container, L["CMD_FORCE_GT"],
-        function() return ns.db.forceGT end,
-        function(v) ns.db.forceGT = v end, L["CMD_FORCE_GT_TIP"]), "right", 26)
-
     local cmdInfo = CreateFrame("Frame", nil, container)
     cmdInfo:SetSize(320, 22)
     local cmdInfoText = cmdInfo:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
@@ -962,15 +958,16 @@ function Options:RebuildDynamic()
 end
 
 ----------------------------------------------------------------------
--- 聊天命令（v2.1：自动避开与其它插件的冲突）
---   1. /gt、/goal 若已被其它插件占用，则自动跳过，改用 /goaltracker
+-- 聊天命令
+--   1. 候选命令若已被其它插件占用，则自动跳过（不抢别人的命令）
 --   2. 登录后再复查一次（有些插件在 PLAYER_ENTERING_WORLD 才注册）
 --   3. 支持自定义命令，或用 /goaltracker cmd xxx 随时改
 ----------------------------------------------------------------------
 local SLASH_ID     = "GOALTRACKER"
 local BASE_COMMAND = "goaltracker"          -- 保底命令，永不放弃
 -- 候选命令按顺序注册，第一个成功的就是主命令（默认 /gttx）
-local CANDIDATES   = { "gttx", "gt", "goal", "gtrack", "goaltrack" }
+-- 注意：只保留本插件专属的长命令，超短的一律不注册，避免和其它插件撞车
+local CANDIDATES   = { "gttx", "gtrack", "goaltrack" }
 
 local function NormCmd(s)
     s = tostring(s or ""):match("^%s*(.-)%s*$")
@@ -1033,9 +1030,6 @@ local function BuildCommandSet()
     local db = ns.db or {}
     if db.chatCommand and db.chatCommand ~= "" then
         table.insert(list, { cmd = db.chatCommand, force = true })
-    end
-    if db.forceGT then
-        table.insert(list, { cmd = "gt", force = true })       -- 用户要求强行接管
     end
     for _, c in ipairs(CANDIDATES) do
         table.insert(list, { cmd = c, force = false })
@@ -1344,6 +1338,13 @@ function Options:Command(msg)
         end
     elseif lower == "gold" then
         ns:PrintGoldBreakdown()
+    elseif lower == "income" or lower == "daily" then
+        if (arg or ""):lower() == "reset" then
+            ns:ResetDailyIncome()
+            print("|cff00c0ffGoalTracker:|r " .. L["INCOME_CLEARED"])
+        else
+            ns:PrintDailyIncome(tonumber(arg) or nil)
+        end
     elseif lower == "test" then
         if ns.Display then
             local goal = ns.FormatNumber(ns.db.moneyGoal or 7000000)
@@ -1376,7 +1377,7 @@ function Options:Command(msg)
     end
 end
 
--- 打印当前真正可用的命令（冲突后 /gt 可能已让出，所以动态显示）
+-- 打印当前真正可用的命令（命令被占用时会动态让出，所以实时显示）
 function Options:PrintCommands(full)
     print("|cff00c0ffGoalTracker:|r " .. string.format(L["CMD_ACTIVE"], ShortCommandList()))
     if #takenCmds > 0 then
