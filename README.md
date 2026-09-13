@@ -236,33 +236,4 @@ A：v2.1.1 的面板「聊天命令」一处引用了后面才声明的局部变
 
 ---
 
-## 九、构建与发布
-
-仓库已带 CurseForge 打包描述文件 `.pkgmeta`，并配了 GitHub Actions（`.github/workflows/release.yml`）。
-
-**自动出包**：打 tag 并推送即触发
-
-```
-git tag v1.0.2
-git push origin v1.0.2
-```
-
-工作流会用 BigWigs 官方打包器按 `.pkgmeta` 生成 `GoalTracker.zip`（排除 `.git` / `.github` 等开发文件，并自动附带 `LICENSE.txt`），作为 artifact 和 Release 附件。
-
-**投到 CurseForge / Wago**：两步
-
-1. 把 CurseForge 的 **Project ID** 写进 `GoalTracker.toc`（项目页面右侧「About Project」方框里的数字）：
-
-   ```
-   ## X-Curse-Project-ID: 123456
-   ```
-
-2. 在仓库 Settings → Secrets and variables → Actions 里添加
-   `CF_API_TOKEN`（CurseForge，注意是 TOKEN 不是 KEY）或 `WAGO_API_TOKEN`（Wago）。
-   出包后会自动投递，不配置则只在本仓库出包。
-
-**手动发布**：把插件目录 `GoalTracker/` 直接压缩成 zip，确保 zip 内是单层 `GoalTracker/` 目录（不要带版本号在文件夹名里），到 authors.curseforge.com 上传即可。
-
----
-
 版本：1.0.2 · 作者 fierymax（默认命令 /gttx；鼠标提示里的每日收入折线图；原生设置窗体 + 保存/关闭；大里程碑专属鼓励语 + 花钱惋惜提示；内置 50 句鼓励语；兼容 12.0.x 客户端）
